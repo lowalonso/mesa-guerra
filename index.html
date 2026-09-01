@@ -522,6 +522,7 @@ body.guerra .topo, body.guerra header{box-shadow:inset 0 -2px 0 rgba(224,60,20,.
   <button class="tb" id="btAjuda">? Como usar</button>
   <button class="tb prim" id="btSemana">⚑ Avançar semana</button>
   <button class="tb" id="btGuerra" style="display:none">🔥 Modo Guerra</button>
+  <button class="tb" id="btZerar" style="display:none">↺ Reiniciar</button>
   <button class="tb" id="btPNG">⭳ PNG</button>
   <button class="tb" id="btExportar">Exportar</button>
   <button class="tb" id="btImportar">Importar</button>
@@ -641,7 +642,7 @@ const MESAS = {
 let SALA   = new URLSearchParams(location.search).get("mesa")  || "";
 let EU     = new URLSearchParams(location.search).get("nome")  || "";
 let MESTRE = new URLSearchParams(location.search).get("mestre")==="1";
-/* BUILD:v-095200-rotasPaz */
+/* BUILD:v-100000-zerar */
 function personagensDetalhados(){ return [
  {id:"sollum", nome:"Sollum, O Corvo", classe:"Ladino", faccao:"Polaris", cor:"var(--polaris)",
   conceito:"Mafioso metamorfo, dono do bordel. A Murder de corvos vê tudo.", base:4, ouro:500, vel:1, postos:[], arcano:15, hab:["espionar","bordel","chantagear"], npcs:{espionar:"Mindinho", bordel:"Mindinho", chantagear:"Corvo Velho"}},
@@ -1809,7 +1810,33 @@ function resolver(m){
   return {esp,medo,mod,total,sucesso,comEsp,critico,txt:a[chave],efeito:ef.join(" "),acao:a,pin:p,notas,quem:executor};
 }
 
+function reiniciarCampanha(){
+  const ini=personagensIniciais();
+  E.semana=1; E.missoes=[]; E.cond={}; E.modoGuerra=false; E.ouro=0;
+  E.objetivos=objetivosIniciais();
+  E.relacoes=Object.assign({},REL_INICIAL);
+  E.personagens.forEach(p=>{
+    const r=ini.find(x=>x.id===p.id)||ini.find(x=>x.nome===p.nome);
+    p.ouro = r&&r.ouro!=null ? r.ouro : 500;
+  });
+  E.log=[];
+  registrar("↺ <b>A campanha recomeça.</b> Semana 1: ouro, missões, objetivos, relações e condições voltaram ao início. Locais e personagens preservados.","esp");
+  fechar(); desenharTudo();
+}
+function confirmarZerar(){
+  mbox.innerHTML=`<h3>↺ Reiniciar campanha</h3><div class="msub">Mesa ${escapar(SALA||"")}</div>
+    <div class="resultado" style="--rc:var(--neg2)"><div class="rt">Volta ao início</div>
+      <p style="font-size:14px">semana → 1 · ouro dos personagens → valor de ficha · missões e viagens canceladas · objetivos e contadores das nações · relações · condições · modo guerra desligado · diário limpo</p></div>
+    <div class="resultado" style="--rc:var(--acc2);margin-top:8px"><div class="rt">Fica como está</div>
+      <p style="font-size:14px">todos os locais do mapa · personagens com fichas, habilidades, arcanos, bases e postos</p></div>
+    <p style="color:var(--dim);font-size:12.5px;margin-top:8px">Vale para todos na sala e não tem desfazer.</p>
+    <div class="btns"><button class="btn" style="--bc:var(--neg2)" data-x="z">Reiniciar agora</button><button class="btn alt" data-x="c">Cancelar</button></div>`;
+  abrirModal();
+  mbox.querySelector('[data-x="z"]').onclick=reiniciarCampanha;
+  mbox.querySelector('[data-x="c"]').onclick=fechar;
+}
 (function(){
+  const bz=$("#btZerar"); bz.onclick=confirmarZerar;
   const bg=$("#btGuerra");
   if(MESTRE) bg.style.display="";
   const wrap=$("#mapimg").parentElement;
@@ -2319,6 +2346,8 @@ function desenharResumo(){
 function desenharTudo(){
   document.body.classList.toggle("guerra", !!E.modoGuerra);
   fogoAtiva(!!E.modoGuerra);
+  const bz=document.getElementById("btZerar");
+  if(bz) bz.style.display = MESTRE ? "" : "none";
   const bg=document.getElementById("btGuerra");
   if(bg){ bg.style.display = MESTRE ? "" : "none";
     bg.textContent=E.modoGuerra?"🕊 Cessar-fogo":"🔥 Modo Guerra"; bg.classList.toggle("on",!!E.modoGuerra); }
@@ -3185,7 +3214,7 @@ function escolherAlvos(carta, efs, facSugerida, aoConfirmar){
 // grava na hora se o usuário recarregar/fechar com edição pendente
 window.addEventListener("pagehide", ()=>{ if(dbRef && salvePendente){ clearTimeout(tSalvar); enviarEstado(); } });
 window.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && dbRef && salvePendente){ clearTimeout(tSalvar); enviarEstado(); } });
-console.log("%cMESA DE ALTHAS build: v-095200-rotasPaz","color:#c9a227;font-weight:bold");
+console.log("%cMESA DE ALTHAS build: v-100000-zerar","color:#c9a227;font-weight:bold");
 carregar();
 </script>
 </body>

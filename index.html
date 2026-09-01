@@ -636,7 +636,7 @@ const MESAS = {
 let SALA   = new URLSearchParams(location.search).get("mesa")  || "";
 let EU     = new URLSearchParams(location.search).get("nome")  || "";
 let MESTRE = new URLSearchParams(location.search).get("mestre")==="1";
-/* BUILD:v-090500-guerra */
+/* BUILD:v-091200-btnGuerra */
 function personagensDetalhados(){ return [
  {id:"sollum", nome:"Sollum, O Corvo", classe:"Ladino", faccao:"Polaris", cor:"var(--polaris)",
   conceito:"Mafioso metamorfo, dono do bordel. A Murder de corvos vê tudo.", base:4, ouro:500, vel:1, postos:[], arcano:15, hab:["espionar","bordel","chantagear"], npcs:{espionar:"Mindinho", bordel:"Mindinho", chantagear:"Corvo Velho"}},
@@ -2211,7 +2211,8 @@ function desenharResumo(){
 function desenharTudo(){
   document.body.classList.toggle("guerra", !!E.modoGuerra);
   const bg=document.getElementById("btGuerra");
-  if(bg){ bg.textContent=E.modoGuerra?"🕊 Cessar-fogo":"🔥 Modo Guerra"; bg.classList.toggle("on",!!E.modoGuerra); }
+  if(bg){ bg.style.display = MESTRE ? "" : "none";
+    bg.textContent=E.modoGuerra?"🕊 Cessar-fogo":"🔥 Modo Guerra"; bg.classList.toggle("on",!!E.modoGuerra); }
   desenharPins(); desenharRotas(); desenharMesa(); desenharLocais(); desenharLog(); desenharObjetivos(); desenharResumo(); salvar(); }
 
 // ==================== ABAS / FERRAMENTAS ====================
@@ -3075,7 +3076,7 @@ function escolherAlvos(carta, efs, facSugerida, aoConfirmar){
 // grava na hora se o usuário recarregar/fechar com edição pendente
 window.addEventListener("pagehide", ()=>{ if(dbRef && salvePendente){ clearTimeout(tSalvar); enviarEstado(); } });
 window.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && dbRef && salvePendente){ clearTimeout(tSalvar); enviarEstado(); } });
-console.log("%cMESA DE ALTHAS build: v-090500-guerra","color:#c9a227;font-weight:bold");
+console.log("%cMESA DE ALTHAS build: v-091200-btnGuerra","color:#c9a227;font-weight:bold");
 carregar();
 </script>
 </body>

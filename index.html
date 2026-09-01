@@ -95,7 +95,10 @@ body.mapao .resumoObj{display:none;}
 @keyframes corre{to{stroke-dashoffset:-24;}}
 #rotas .rlbl{font-family:'IBM Plex Mono',monospace;font-size:26px;paint-order:stroke;
   stroke:#0d0b12;stroke-width:6px;stroke-linejoin:round;}
-@media(prefers-reduced-motion:reduce){#rotas .rota{animation:none;}}
+#rotas .rglifo{font-size:24px;paint-order:stroke;stroke:#0d0b12;stroke-width:5px;pointer-events:none;
+  animation:marcha 1.2s ease-in-out infinite alternate;}
+@keyframes marcha{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+@media(prefers-reduced-motion:reduce){#rotas .rota{animation:none;}#rotas .rglifo{animation:none;}}
 #fronteiras.off{opacity:0;}
 #fronteiras .terr{mix-blend-mode:multiply;}
 #fronteiras .borda{fill:none;stroke-dasharray:7 7;stroke-linejoin:round;}
@@ -638,7 +641,7 @@ const MESAS = {
 let SALA   = new URLSearchParams(location.search).get("mesa")  || "";
 let EU     = new URLSearchParams(location.search).get("nome")  || "";
 let MESTRE = new URLSearchParams(location.search).get("mestre")==="1";
-/* BUILD:v-093000-chamas */
+/* BUILD:v-095200-rotasPaz */
 function personagensDetalhados(){ return [
  {id:"sollum", nome:"Sollum, O Corvo", classe:"Ladino", faccao:"Polaris", cor:"var(--polaris)",
   conceito:"Mafioso metamorfo, dono do bordel. A Murder de corvos vê tudo.", base:4, ouro:500, vel:1, postos:[], arcano:15, hab:["espionar","bordel","chantagear"], npcs:{espionar:"Mindinho", bordel:"Mindinho", chantagear:"Corvo Velho"}},
@@ -1386,6 +1389,18 @@ const ICONES={
 function icone(tipo){ return ICONES[tipo]||ICONES["Outro"]; }
 
 // ==================== PINS ====================
+const ROTA_ESTILO={
+  cerco:{g:["⚔","🛡"],d:"",ic:"⚔"}, assalto:{g:["🗡"],d:"",ic:"🗡"},
+  sabotagem:{g:["🗝"],d:"5 9",ic:"🗝"}, incendiar:{g:["🔥"],d:"3 9",ic:"🔥"},
+  fortificar:{g:["🧱"],d:"",ic:"🧱"}, recrutar:{g:["⚑"],d:"",ic:"⚑"},
+  _viajar:{g:["🐎"],d:"2 12",ic:"✈"},
+  // tempos de paz
+  ajudar:{g:["🤝"],d:"",ic:"🤝"}, atrapalhar:{g:["🪤"],d:"6 9",ic:"🪤"},
+  saquear:{g:["💰"],d:"",ic:"💰"}, comerciar:{g:["◈"],d:"",ic:"◈"},
+  diplomacia:{g:["📜"],d:"",ic:"📜"}, espionar:{g:["👁"],d:"4 12",ic:"👁"},
+  bordel:{g:["🌹"],d:"4 12",ic:"🌹"}, subornar:{g:["🪙"],d:"6 9",ic:"🪙"},
+  chantagear:{g:["✉"],d:"6 9",ic:"✉"}, boato:{g:["🗣"],d:"3 12",ic:"🗣"}
+};
 function desenharRotas(){
   const svg=$("#rotas"); if(!svg) return;
   let s="";
@@ -1397,9 +1412,26 @@ function desenharRotas(){
     const x1=(o.x/100)*2000, y1=(o.y/100)*1547, x2=(alvo.x/100)*2000, y2=(alvo.y/100)*1547;
     const mx=(x1+x2)/2, my=(y1+y2)/2 - Math.abs(x2-x1)*0.12;   // leve curva
     const cor=corDaFaccao(pe.faccao);
-    s+=`<path class="rota" d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" stroke="${cor}" stroke-width="5" stroke-opacity=".9"/>`;
+    const est=ROTA_ESTILO[m.acao];
+    const A=buscaAcao(m.acao);
+    s+=`<path class="rota" d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" stroke="${cor}" stroke-width="5" stroke-opacity=".9"${est&&est.d!==undefined?` style="stroke-dasharray:${est.d||"none"}"`:""}/>`;
     s+=`<circle cx="${x1}" cy="${y1}" r="9" fill="${cor}"/>`;
-    s+=`<text class="rlbl" x="${mx}" y="${my-14}" text-anchor="middle" fill="${cor}">${escapar(rotuloChefe(pe,m.acao))} · ${m.restam}s</text>`;
+    // símbolos marchando ao longo da curva
+    if(est&&est.g&&est.g.length){
+      const q=t=>({x:(1-t)*(1-t)*x1+2*(1-t)*t*mx+t*t*x2, y:(1-t)*(1-t)*y1+2*(1-t)*t*my+t*t*y2});
+      const compr=Math.hypot(x2-x1,y2-y1)*1.05;
+      const n=Math.max(1,Math.min(9,Math.floor(compr/120)));
+      for(let i=0;i<n;i++){
+        const t=0.16+(i+0.5)*(0.68/n), pt=q(t);
+        s+=`<text class="rglifo" x="${pt.x}" y="${pt.y+9}" text-anchor="middle">${est.g[i%est.g.length]}</text>`;
+      }
+    }
+    // rótulo: ação — quem mandou
+    const quem = m.acao==="_viajar"
+      ? listaNomes(nomesViagem(m).map(n=>n.split(",")[0]))
+      : rotuloChefe(pe,m.acao);
+    const nomeAcao = m.acao==="_viajar" ? "Viagem" : (A? A.n : m.nome||"");
+    s+=`<text class="rlbl" x="${mx}" y="${my-14}" text-anchor="middle" fill="${cor}">${est?est.ic+" ":""}${escapar(nomeAcao)} — ${escapar(quem)} · ${m.restam}s</text>`;
   });
   svg.innerHTML=s;
 }
@@ -3153,7 +3185,7 @@ function escolherAlvos(carta, efs, facSugerida, aoConfirmar){
 // grava na hora se o usuário recarregar/fechar com edição pendente
 window.addEventListener("pagehide", ()=>{ if(dbRef && salvePendente){ clearTimeout(tSalvar); enviarEstado(); } });
 window.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && dbRef && salvePendente){ clearTimeout(tSalvar); enviarEstado(); } });
-console.log("%cMESA DE ALTHAS build: v-093000-chamas","color:#c9a227;font-weight:bold");
+console.log("%cMESA DE ALTHAS build: v-095200-rotasPaz","color:#c9a227;font-weight:bold");
 carregar();
 </script>
 </body>

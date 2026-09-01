@@ -471,6 +471,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* ===== MODO GUERRA v-090500 ===== */
 body.guerra #mapimg{filter:saturate(1.3) contrast(1.1) sepia(.28) hue-rotate(-16deg) brightness(.9);}
 #fogo{display:none;position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden;}
+#fogoCanvas{display:none;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:7;}
+body.guerra #fogoCanvas{display:block;}
 body.guerra #fogo{display:block;}
 #fogo::before{content:"";position:absolute;inset:0;
   background:
@@ -636,7 +638,7 @@ const MESAS = {
 let SALA   = new URLSearchParams(location.search).get("mesa")  || "";
 let EU     = new URLSearchParams(location.search).get("nome")  || "";
 let MESTRE = new URLSearchParams(location.search).get("mestre")==="1";
-/* BUILD:v-091200-btnGuerra */
+/* BUILD:v-093000-chamas */
 function personagensDetalhados(){ return [
  {id:"sollum", nome:"Sollum, O Corvo", classe:"Ladino", faccao:"Polaris", cor:"var(--polaris)",
   conceito:"Mafioso metamorfo, dono do bordel. A Murder de corvos vê tudo.", base:4, ouro:500, vel:1, postos:[], arcano:15, hab:["espionar","bordel","chantagear"], npcs:{espionar:"Mindinho", bordel:"Mindinho", chantagear:"Corvo Velho"}},
@@ -897,6 +899,80 @@ const ACOES_GUERRA=[
   se:"Colunas novas marcham sob o estandarte.",sm:"Vêm — mas são verdes e caros.",fe:"A leva foge na primeira noite.",fm:"Recrutadores linchados pela vila."}
 ];
 function buscaAcao(id){ return ACOES.find(x=>x.id===id) || ACOES_GUERRA.find(x=>x.id===id); }
+
+// --- fogo em canvas: labaredas nos locais, brasas e fumaça ---
+let fgC=null,fgX=null,fgRAF=0,fgP=[],fgT=0;
+const FG_MAX=260, FG_MOVOK=!window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function fogoSetup(){
+  const img=document.getElementById("mapimg"); if(!img) return;
+  const wrap=img.parentElement;
+  if(!document.getElementById("fogoCanvas")){
+    fgC=document.createElement("canvas"); fgC.id="fogoCanvas"; wrap.appendChild(fgC);
+  } else fgC=document.getElementById("fogoCanvas");
+  fgX=fgC.getContext("2d");
+}
+function fgResize(){
+  const w=fgC.parentElement.clientWidth, h=fgC.parentElement.clientHeight;
+  if(fgC.width!==w||fgC.height!==h){ fgC.width=w; fgC.height=h; }
+}
+function fgSpawn(){
+  const W=fgC.width,H=fgC.height;
+  // labaredas em cada local
+  (E.pins||[]).slice(0,30).forEach(pin=>{
+    if(fgP.length>FG_MAX) return;
+    if(Math.random()<.75){
+      const x=pin.x/100*W, y=pin.y/100*H;
+      fgP.push({t:"ch",x:x+(Math.random()*14-7),y:y+4,vx:(Math.random()-.5)*.3,
+        vy:-(1.1+Math.random()*1.5),r:3+Math.random()*5,l:0,m:26+Math.random()*22});
+      if(Math.random()<.25) fgP.push({t:"fu",x:x+(Math.random()*18-9),y:y-6,vx:(Math.random()-.5)*.35,
+        vy:-(.4+Math.random()*.5),r:5+Math.random()*7,l:0,m:70+Math.random()*50});
+    }
+  });
+  // brasas soltas pelo mapa
+  if(fgP.length<FG_MAX && Math.random()<.6)
+    fgP.push({t:"br",x:Math.random()*W,y:H*(0.55+Math.random()*.45),vx:(Math.random()-.5)*.5,
+      vy:-(.5+Math.random()*.9),r:1+Math.random()*1.6,l:0,m:90+Math.random()*80});
+}
+function fgDraw(){
+  const W=fgC.width,H=fgC.height; fgX.clearRect(0,0,W,H);
+  // fumaça primeiro (normal), depois luz (lighter)
+  fgP.forEach(p=>{ if(p.t!=="fu")return; const a=(1-p.l/p.m)*.16;
+    fgX.fillStyle=`rgba(60,50,48,${a})`;
+    fgX.beginPath(); fgX.arc(p.x,p.y,p.r*(1+p.l/p.m*1.8),0,7); fgX.fill(); });
+  fgX.globalCompositeOperation="lighter";
+  fgP.forEach(p=>{
+    const k=p.l/p.m;
+    if(p.t==="ch"){
+      const r=p.r*(1-k*.75), a=(1-k);
+      const g=fgX.createRadialGradient(p.x,p.y,0,p.x,p.y,r*2.6);
+      g.addColorStop(0,`rgba(255,235,150,${.85*a})`);
+      g.addColorStop(.35,`rgba(255,140,30,${.55*a})`);
+      g.addColorStop(1,"rgba(180,30,0,0)");
+      fgX.fillStyle=g; fgX.beginPath(); fgX.arc(p.x,p.y,r*2.6,0,7); fgX.fill();
+    } else if(p.t==="br"){
+      fgX.fillStyle=`rgba(255,${150+Math.random()*70|0},60,${(1-k)*.9})`;
+      fgX.beginPath(); fgX.arc(p.x,p.y,p.r,0,7); fgX.fill();
+    }
+  });
+  fgX.globalCompositeOperation="source-over";
+}
+function fgStep(){
+  fgRAF=0;
+  if(!E.modoGuerra||document.hidden){ if(fgX&&fgC) fgX.clearRect(0,0,fgC.width,fgC.height); return; }
+  fgResize(); fgT++;
+  if(fgT%2===0) fgSpawn();
+  fgP.forEach(p=>{ p.l++; p.x+=p.vx+Math.sin((fgT+p.m)*.15)*.25; p.y+=p.vy; if(p.t==="ch")p.vy*=.985; });
+  fgP=fgP.filter(p=>p.l<p.m);
+  fgDraw();
+  fgRAF=requestAnimationFrame(fgStep);
+}
+function fogoAtiva(on){
+  if(!fgC) fogoSetup();
+  if(on && FG_MOVOK && !fgRAF) fgRAF=requestAnimationFrame(fgStep);
+  if(!on){ fgP=[]; if(fgX&&fgC) fgX.clearRect(0,0,fgC.width,fgC.height); }
+}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&E&&E.modoGuerra) fogoAtiva(true); });
+
 
 
 // descrição automática dos efeitos — a prévia e a aplicação nunca divergem
@@ -2210,6 +2286,7 @@ function desenharResumo(){
 }
 function desenharTudo(){
   document.body.classList.toggle("guerra", !!E.modoGuerra);
+  fogoAtiva(!!E.modoGuerra);
   const bg=document.getElementById("btGuerra");
   if(bg){ bg.style.display = MESTRE ? "" : "none";
     bg.textContent=E.modoGuerra?"🕊 Cessar-fogo":"🔥 Modo Guerra"; bg.classList.toggle("on",!!E.modoGuerra); }
@@ -3076,7 +3153,7 @@ function escolherAlvos(carta, efs, facSugerida, aoConfirmar){
 // grava na hora se o usuário recarregar/fechar com edição pendente
 window.addEventListener("pagehide", ()=>{ if(dbRef && salvePendente){ clearTimeout(tSalvar); enviarEstado(); } });
 window.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && dbRef && salvePendente){ clearTimeout(tSalvar); enviarEstado(); } });
-console.log("%cMESA DE ALTHAS build: v-091200-btnGuerra","color:#c9a227;font-weight:bold");
+console.log("%cMESA DE ALTHAS build: v-093000-chamas","color:#c9a227;font-weight:bold");
 carregar();
 </script>
 </body>
